@@ -1,0 +1,31 @@
+{
+  "name": "pharmfinder-mvp",
+  "private": true,
+  "version": "1.0.0",
+  "description": "약국 재고 정보 전달 중심 웹사이트 MVP",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/bruhcio/pharmfinder-mvp-20260421.git"
+  },
+  "keywords": [],
+  "author": "bruhcio",
+  "license": "ISC",
+  "type": "module",
+  "bugs": {
+    "url": "https://github.com/bruhcio/pharmfinder-mvp-20260421/issues"
+  },
+  "homepage": "https://github.com/bruhcio/pharmfinder-mvp-20260421#readme",
+  "dependencies": {
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^6.0.1",
+    "vite": "^8.0.9"
+  }
+}
