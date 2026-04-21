@@ -1,0 +1,12 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+
+# Local runtime artifacts
+*.log
+
+# Optional future frontend tooling
+node_modules/
+dist/
+.next/
+out/

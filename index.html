@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PharmFinder MVP</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=SUIT:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="ambient ambient-a"></div>
+    <div class="ambient ambient-b"></div>
+
+    <div class="shell">
+      <header class="hero">
+        <nav class="topbar">
+          <div class="brand">
+            <span class="brand-badge">PF</span>
+            <div>
+              <strong>PharmFinder</strong>
+              <p>약국 재고 검색 서비스 MVP</p>
+            </div>
+          </div>
+          <div class="top-actions">
+            <a class="ghost-button tappable" href="#consumer">검색 체험</a>
+            <a class="primary-button tappable" href="#pharmacy-admin">약사 화면</a>
+          </div>
+        </nav>
+
+        <section class="hero-grid">
+          <div class="hero-copy">
+            <span class="eyebrow">Location + Inventory Intelligence</span>
+            <h1>가까운 약국과 재고가 많은 약국을 동시에 추천하는 방문 전 확인 중심 탐색 경험</h1>
+            <p>
+              소비자는 약 이름이나 사진으로 검색하고, 서비스는 현재 위치 기준 가까운 약국과
+              가장 많이 보유한 약국을 각각 추천합니다. 이 서비스는 판매나 예약이 아니라
+              재고 정보 전달과 전화 문의, 길찾기를 돕는 용도로 설계됩니다.
+            </p>
+            <div class="hero-cta">
+              <a class="primary-button tappable" href="#consumer">소비자 플로우 보기</a>
+              <a class="secondary-button tappable" href="#plan">구현 전략 보기</a>
+            </div>
+            <div class="hero-metrics">
+              <div class="metric-card">
+                <span>추천 축 01</span>
+                <strong>내 위치 기준</strong>
+                <p>가장 가까운 약국 우선 정렬</p>
+              </div>
+              <div class="metric-card">
+                <span>추천 축 02</span>
+                <strong>재고 보유량 기준</strong>
+                <p>가장 많이 가진 약국 우선 노출</p>
+              </div>
+              <div class="metric-card">
+                <span>인터랙션</span>
+                <strong>슬라이드 패널</strong>
+                <p>카드 선택 시 상세 정보 확장</p>
+              </div>
+            </div>
+          </div>
+
+          <div class="hero-stage card">
+            <div class="stage-ribbon">Dual Recommendation Engine</div>
+            <div class="stage-stack">
+              <div class="stage-layer layer-top">
+                <span>가까운 약국 추천</span>
+                <strong>현재 위치 반영</strong>
+              </div>
+              <div class="stage-layer layer-mid">
+                <span>많이 가진 약국 추천</span>
+                <strong>재고 수량 반영</strong>
+              </div>
+              <div class="stage-layer layer-low">
+                <span>선택 후 슬라이드</span>
+                <strong>상세 재고 정보 확장</strong>
+              </div>
+            </div>
+          </div>
+        </section>
+      </header>
+
+      <main>
+        <section id="consumer" class="section">
+          <div class="section-head">
+            <span class="eyebrow">Consumer Flow</span>
+            <h2>소비자 검색 경험</h2>
+          </div>
+
+          <div class="consumer-shell">
+            <section class="search-rail card">
+              <div class="search-mode-tabs">
+                <button class="tab-button tappable is-active" data-mode="name">이름 검색</button>
+                <button class="tab-button tappable" data-mode="photo">사진 검색</button>
+                <button class="tab-button tappable" data-mode="pharmacy">약국 검색</button>
+              </div>
+
+              <div class="search-box">
+                <label for="medicine-search">약 이름 또는 성분명</label>
+                <input
+                  id="medicine-search"
+                  type="text"
+                  placeholder="예: 타이레놀, 아세트아미노펜, 아드빌"
+                  autocomplete="off"
+                />
+                <div id="autocomplete" class="autocomplete"></div>
+              </div>
+
+              <div class="search-actions">
+                <button id="search-button" class="primary-button tappable">재고 정보 확인</button>
+                <label class="upload-button tappable">
+                  사진 업로드
+                  <input id="photo-input" type="file" accept="image/*" />
+                </label>
+              </div>
+
+              <div class="location-box">
+                <div>
+                  <strong>현재 위치 기반 추천</strong>
+                  <p id="location-label">위치를 아직 불러오지 않았습니다.</p>
+                </div>
+                <button id="location-button" class="ghost-button tappable" type="button">내 위치 사용</button>
+              </div>
+
+              <div class="info-notice">
+                <strong>위치 안내</strong>
+                <p>위치 정보는 가까운 약국 추천에만 사용하며, 실제 서비스에서는 동의 후 최소 범위로 처리됩니다.</p>
+              </div>
+
+              <div class="sort-panel">
+                <span class="sort-label">추천 방식</span>
+                <div class="sort-options">
+                  <button class="sort-button tappable is-active" data-sort="distance" type="button">
+                    가까운 약국 우선
+                  </button>
+                  <button class="sort-button tappable" data-sort="stock" type="button">
+                    재고 많은 약국 우선
+                  </button>
+                </div>
+              </div>
+
+              <div id="photo-hint" class="photo-hint">
+                사진 검색은 현재 데모 모드입니다. 파일명에 약 이름이 포함되면 후보를 자동 추천합니다.
+              </div>
+
+              <div class="info-notice">
+                <strong>안내</strong>
+                <p>표시되는 재고는 참고용입니다. 실제 구매 가능 여부와 복약 상담은 반드시 해당 약국 약사에게 직접 확인하세요.</p>
+              </div>
+
+              <div class="quick-tags">
+                <button class="tag tappable" data-medicine="타이레놀정500mg">타이레놀</button>
+                <button class="tag tappable" data-medicine="판콜에이내복액">판콜A</button>
+                <button class="tag tappable" data-medicine="아드빌정">아드빌</button>
+                <button class="tag tappable" data-medicine="겔포스엠현탁액">겔포스엠</button>
+              </div>
+            </section>
+
+            <section class="results-stage">
+              <article class="card results-panel">
+                <div class="panel-head">
+                  <div>
+                    <h3>추천 결과</h3>
+                    <p id="result-summary">약 이름을 검색하면 가까운 약국과 재고 많은 약국을 나눠서 보여주고, 전화 문의 전 확인에 도움을 줍니다.</p>
+                  </div>
+                </div>
+                <div class="result-columns">
+                  <div class="result-lane">
+                    <div class="lane-head">
+                      <span class="lane-chip distance">가까운 약국</span>
+                      <p id="distance-summary">내 위치 기준 추천이 여기에 표시됩니다.</p>
+                    </div>
+                    <div id="distance-results" class="results"></div>
+                  </div>
+                  <div class="result-lane">
+                    <div class="lane-head">
+                      <span class="lane-chip stock">재고 많은 약국</span>
+                      <p id="stock-summary">보유량 기준 추천이 여기에 표시됩니다.</p>
+                    </div>
+                    <div id="stock-results" class="results"></div>
+                  </div>
+                </div>
+              </article>
+
+              <aside id="slide-panel" class="slide-panel" aria-live="polite">
+                <div class="slide-panel-inner">
+                  <div class="slide-head">
+                    <span class="slide-pill">Pharmacy Detail</span>
+                    <button id="close-slide" class="ghost-button tappable slide-close" type="button">닫기</button>
+                  </div>
+                  <div id="pharmacy-detail-pane" class="slide-content">
+                    <h3>약국을 선택하세요</h3>
+                    <p>검색 결과에서 약국 카드를 누르면 상세 재고 패널이 오른쪽에서 슬라이드됩니다.</p>
+                  </div>
+                </div>
+              </aside>
+            </section>
+          </div>
+        </section>
+
+        <section id="service-principles" class="section">
+          <div class="section-head">
+            <span class="eyebrow">Service Principles</span>
+            <h2>리스크를 낮추는 서비스 원칙</h2>
+          </div>
+          <div class="plan-grid">
+            <article class="card">
+              <h3>정보 제공 중심</h3>
+              <p>서비스는 약국 위치, 운영시간, 재고 상태, 갱신 시각을 전달하는 정보 플랫폼으로 동작합니다.</p>
+            </article>
+            <article class="card">
+              <h3>판매 행위 배제</h3>
+              <p>앱 안에서 주문, 결제, 예약 확정, 픽업 보장 같은 흐름은 두지 않고 전화 문의와 길찾기 중심으로 안내합니다.</p>
+            </article>
+            <article class="card">
+              <h3>최종 확인 주체 명확화</h3>
+              <p>구매 가능 여부와 복약 관련 판단은 해당 약국 약사 확인이 최종이라는 문구를 핵심 화면에 반복 노출합니다.</p>
+            </article>
+          </div>
+        </section>
+
+        <section id="plan" class="section">
+          <div class="section-head">
+            <span class="eyebrow">Plan</span>
+            <h2>이번 확장에서 반영한 핵심</h2>
+          </div>
+          <div class="plan-grid">
+            <article class="card">
+              <h3>거리 기반 추천</h3>
+              <p>브라우저 Geolocation API로 현재 위치를 받으면, 약국 좌표와의 거리를 재계산해 가장 가까운 약국을 상단 추천합니다.</p>
+            </article>
+            <article class="card">
+              <h3>재고 보유량 추천</h3>
+              <p>검색 약품의 재고 수량을 기준으로 정렬해 가장 많이 보유한 약국을 별도 추천 레인으로 제공합니다.</p>
+            </article>
+            <article class="card">
+              <h3>슬라이드 UI</h3>
+              <p>약국 카드 클릭 시 상세 정보가 우측에서 전개되는 구조로 바꿔, 검색 흐름을 끊지 않고 재고를 확인할 수 있게 했습니다.</p>
+            </article>
+          </div>
+        </section>
+
+        <section id="pharmacy-admin" class="section">
+          <div class="section-head">
+            <span class="eyebrow">Pharmacy Admin</span>
+            <h2>약사 재고 관리 화면</h2>
+          </div>
+
+          <div class="admin-layout">
+            <article class="card">
+              <h3>재고 수정</h3>
+              <div class="admin-form">
+                <label>
+                  약국 선택
+                  <select id="pharmacy-select"></select>
+                </label>
+                <label>
+                  약품 선택
+                  <input id="admin-medicine-search" type="text" placeholder="약품명 검색" autocomplete="off" />
+                  <div id="admin-autocomplete" class="autocomplete"></div>
+                </label>
+                <label>
+                  재고 수량
+                  <input id="stock-count" type="number" min="0" value="10" />
+                </label>
+                <label>
+                  상태
+                  <select id="stock-status">
+                    <option value="충분">충분</option>
+                    <option value="소량">소량</option>
+                    <option value="품절 임박">품절 임박</option>
+                    <option value="품절">품절</option>
+                  </select>
+                </label>
+                <button id="save-stock" class="primary-button tappable" type="button">재고 저장</button>
+              </div>
+              <p class="helper">실서비스에서는 POS/ERP 연동 품목은 자동 동기화하고, 누락 품목만 수기 보정하는 구조가 적합합니다.</p>
+            </article>
+
+            <article class="card">
+              <h3>현재 약국 재고 스냅샷</h3>
+              <div id="inventory-board" class="inventory-board"></div>
+            </article>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
