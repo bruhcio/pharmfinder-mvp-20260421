@@ -1,22 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { medicines, seedPharmacies } from "./data";
 
-const STORAGE_KEY = "pharmfinder-demo-pharmacies";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "";
 const QUICK_TAGS = ["타이레놀정500mg", "판콜에이내복액", "아드빌정", "겔포스엠현탁액"];
-
-function loadPharmacies() {
-  const saved = window.localStorage.getItem(STORAGE_KEY);
-  if (!saved) return structuredClone(seedPharmacies);
-  try {
-    return JSON.parse(saved);
-  } catch {
-    return structuredClone(seedPharmacies);
-  }
-}
-
-function persistPharmacies(pharmacies) {
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(pharmacies));
-}
 
 function stockClassName(status) {
   if (status === "충분") return "high";
@@ -25,148 +10,151 @@ function stockClassName(status) {
   return "none";
 }
 
-function haversineKm(lat1, lng1, lat2, lng2) {
-  const toRad = (value) => (value * Math.PI) / 180;
-  const earthRadiusKm = 6371;
-  const dLat = toRad(lat2 - lat1);
-  const dLng = toRad(lng2 - lng1);
-  const a =
-    Math.sin(dLat / 2) ** 2 +
-    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
-  return earthRadiusKm * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)));
-}
-
-function resolveMedicine(query) {
-  const normalized = query.trim().toLowerCase();
-  if (!normalized) return null;
-  return (
-    medicines.find((medicine) => {
-      const haystack = [medicine.name, ...medicine.aliases, medicine.category].join(" ").toLowerCase();
-      return haystack.includes(normalized);
-    }) ?? null
-  );
-}
-
 function buildNaverMapUrl(pharmacy) {
   return `https://map.naver.com/p/search/${encodeURIComponent(pharmacy.name)}`;
 }
 
+async function requestJson(path, options) {
+  const response = await fetch(`${API_BASE}${path}`, options);
+  if (!response.ok) {
+    throw new Error(`Request failed: ${response.status}`);
+  }
+  return response.json();
+}
+
 function App() {
-  const [pharmacies, setPharmacies] = useState(() => loadPharmacies());
   const [activeMode, setActiveMode] = useState("name");
   const [preferredSort, setPreferredSort] = useState("distance");
   const [query, setQuery] = useState("");
-  const [selectedMedicineId, setSelectedMedicineId] = useState(null);
-  const [selectedPharmacyId, setSelectedPharmacyId] = useState(seedPharmacies[0]?.id ?? null);
+  const [city, setCity] = useState("서울특별시");
+  const [district, setDistrict] = useState("강남구");
+  const [medicineSuggestions, setMedicineSuggestions] = useState([]);
+  const [selectedMedicine, setSelectedMedicine] = useState(null);
+  const [partnerDistance, setPartnerDistance] = useState([]);
+  const [partnerStock, setPartnerStock] = useState([]);
+  const [publicPharmacies, setPublicPharmacies] = useState([]);
+  const [summary, setSummary] = useState("");
   const [slideOpen, setSlideOpen] = useState(false);
+  const [selectedPharmacyId, setSelectedPharmacyId] = useState(null);
   const [highlightedMedicineId, setHighlightedMedicineId] = useState(null);
-  const [photoHint, setPhotoHint] = useState("사진 검색은 현재 데모 모드입니다. 파일명에 약 이름이 포함되면 후보를 자동 추천합니다.");
+  const [partners, setPartners] = useState([]);
+  const [serviceStatus, setServiceStatus] = useState({ apis: { medicine: false, pharmacy: false } });
+  const [photoHint, setPhotoHint] = useState("사진 검색은 OCR 기반으로 텍스트를 읽고, 읽힌 결과를 약품 검색으로 연결합니다.");
   const [locationLabel, setLocationLabel] = useState("위치를 아직 불러오지 않았습니다.");
   const [userLocation, setUserLocation] = useState(null);
   const [adminMedicineQuery, setAdminMedicineQuery] = useState("");
-  const [adminMedicineId, setAdminMedicineId] = useState(null);
   const [adminCount, setAdminCount] = useState(10);
   const [adminStatus, setAdminStatus] = useState("충분");
   const [toast, setToast] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [publicDirectoryLoading, setPublicDirectoryLoading] = useState(false);
   const closeTimer = useRef(null);
 
-  useEffect(() => {
-    persistPharmacies(pharmacies);
-  }, [pharmacies]);
-
-  useEffect(() => () => window.clearTimeout(closeTimer.current), []);
-
   const selectedPharmacy = useMemo(
-    () => pharmacies.find((pharmacy) => pharmacy.id === selectedPharmacyId) ?? pharmacies[0] ?? null,
-    [pharmacies, selectedPharmacyId]
+    () => partners.find((pharmacy) => pharmacy.id === selectedPharmacyId) ?? partners[0] ?? null,
+    [partners, selectedPharmacyId]
   );
 
-  const searchMatches = useMemo(() => {
-    if (!query.trim()) return { medicine: null, distanceSorted: [], stockSorted: [], summary: "" };
-
-    if (activeMode === "pharmacy") {
-      const matches = pharmacies.filter((pharmacy) => pharmacy.name.includes(query) || pharmacy.address.includes(query));
-      return {
-        medicine: null,
-        distanceSorted: matches,
-        stockSorted: matches,
-        summary: `"${query}" 기준으로 ${matches.length}개 약국을 찾았습니다.`
-      };
-    }
-
-    const medicine = medicines.find((item) => item.id === selectedMedicineId) ?? resolveMedicine(query);
-    if (!medicine) {
-      return {
-        medicine: null,
-        distanceSorted: [],
-        stockSorted: [],
-        summary: `"${query}"와 일치하는 약품을 찾지 못했습니다.`
-      };
-    }
-
-    const matched = pharmacies
-      .map((pharmacy) => {
-        const stock = pharmacy.inventory.find((item) => item.medicineId === medicine.id);
-        if (!stock) return null;
-        return {
-          ...pharmacy,
-          stock,
-          calculatedDistance: userLocation
-            ? haversineKm(userLocation.lat, userLocation.lng, pharmacy.lat, pharmacy.lng)
-            : pharmacy.distanceKm
-        };
-      })
-      .filter(Boolean);
-
-    const distanceSorted = matched
-      .slice()
-      .sort((a, b) => a.calculatedDistance - b.calculatedDistance || b.stock.count - a.stock.count);
-    const stockSorted = matched
-      .slice()
-      .sort((a, b) => b.stock.count - a.stock.count || a.calculatedDistance - b.calculatedDistance);
-
-    return {
-      medicine,
-      distanceSorted,
-      stockSorted,
-      summary: `${medicine.name} 재고를 가진 약국 ${matched.length}곳을 찾았습니다.`
-    };
-  }, [activeMode, pharmacies, query, selectedMedicineId, userLocation]);
+  const pharmacyInventory = useMemo(
+    () => (selectedPharmacy?.inventory ?? []).slice().sort((a, b) => b.count - a.count),
+    [selectedPharmacy]
+  );
 
   useEffect(() => {
-    const primary = preferredSort === "stock" ? searchMatches.stockSorted[0] : searchMatches.distanceSorted[0];
-    if (primary) {
-      setSelectedPharmacyId(primary.id);
-      setHighlightedMedicineId(searchMatches.medicine?.id ?? null);
-    }
-  }, [preferredSort, searchMatches]);
+    bootstrap();
+    return () => window.clearTimeout(closeTimer.current);
+  }, []);
 
-  const medicineSuggestions = useMemo(() => {
-    if (!query.trim() || activeMode === "pharmacy") return [];
-    const normalized = query.trim().toLowerCase();
-    return medicines
-      .filter((medicine) => {
-        const haystack = [medicine.name, ...medicine.aliases, medicine.category].join(" ").toLowerCase();
-        return haystack.includes(normalized);
-      })
-      .slice(0, 6);
+  useEffect(() => {
+    if (activeMode === "pharmacy" || !query.trim()) {
+      setMedicineSuggestions([]);
+      return;
+    }
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const data = await requestJson(`/api/medicines/search?q=${encodeURIComponent(query)}`);
+        setMedicineSuggestions(data.items ?? []);
+      } catch {
+        setMedicineSuggestions([]);
+      }
+    }, 240);
+
+    return () => window.clearTimeout(timer);
   }, [activeMode, query]);
 
-  const adminSuggestions = useMemo(() => {
-    if (!adminMedicineQuery.trim()) return [];
-    const normalized = adminMedicineQuery.trim().toLowerCase();
-    return medicines
-      .filter((medicine) => {
-        const haystack = [medicine.name, ...medicine.aliases, medicine.category].join(" ").toLowerCase();
-        return haystack.includes(normalized);
-      })
-      .slice(0, 6);
-  }, [adminMedicineQuery]);
+  async function bootstrap() {
+    try {
+      const [partnerData, statusData, publicData] = await Promise.all([
+        requestJson("/api/pharmacies/partners"),
+        requestJson("/api/status"),
+        requestJson(`/api/pharmacies/public?city=${encodeURIComponent(city)}&district=${encodeURIComponent(district)}`)
+      ]);
+      setPartners(partnerData.items ?? []);
+      setSelectedPharmacyId(partnerData.items?.[0]?.id ?? null);
+      setServiceStatus(statusData);
+      setPublicPharmacies(publicData.items ?? []);
+    } catch {
+      triggerToast("초기 데이터를 불러오지 못했습니다.");
+    }
+  }
 
   function triggerToast(message) {
     setToast(message);
     window.clearTimeout(closeTimer.current);
     closeTimer.current = window.setTimeout(() => setToast(""), 2200);
+  }
+
+  async function handleSearch(nextQuery = query) {
+    if (!nextQuery.trim()) {
+      setSummary("");
+      setPartnerDistance([]);
+      setPartnerStock([]);
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const params = new URLSearchParams({
+        q: nextQuery,
+        mode: activeMode,
+        city,
+        district
+      });
+      if (userLocation) {
+        params.set("lat", String(userLocation.lat));
+        params.set("lng", String(userLocation.lng));
+      }
+      const data = await requestJson(`/api/search?${params.toString()}`);
+      setSummary(data.summary || "");
+      setSelectedMedicine(data.medicine || null);
+      setPartnerDistance(data.partnerDistance || []);
+      setPartnerStock(data.partnerStock || []);
+      setPublicPharmacies(data.publicPharmacies || []);
+      const primary = preferredSort === "stock" ? data.partnerStock?.[0] : data.partnerDistance?.[0];
+      if (primary) {
+        setSelectedPharmacyId(primary.id);
+        setHighlightedMedicineId(data.medicine?.id ?? null);
+      }
+    } catch {
+      triggerToast("검색 중 오류가 발생했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handlePublicDirectoryRefresh() {
+    setPublicDirectoryLoading(true);
+    try {
+      const data = await requestJson(`/api/pharmacies/public?city=${encodeURIComponent(city)}&district=${encodeURIComponent(district)}`);
+      setPublicPharmacies(data.items ?? []);
+      triggerToast("공공 약국 정보를 새로 불러왔습니다.");
+    } catch {
+      triggerToast("공공 약국 정보를 불러오지 못했습니다.");
+    } finally {
+      setPublicDirectoryLoading(false);
+    }
   }
 
   function handleLocationRequest() {
@@ -182,6 +170,9 @@ function App() {
         setUserLocation(nextLocation);
         setLocationLabel(`현재 위치 반영 완료: 위도 ${nextLocation.lat.toFixed(4)}, 경도 ${nextLocation.lng.toFixed(4)}`);
         triggerToast("현재 위치를 반영했습니다.");
+        if (query.trim()) {
+          handleSearch();
+        }
       },
       () => {
         setLocationLabel("위치 권한이 없어 기본 거리 기준으로 추천합니다.");
@@ -194,68 +185,72 @@ function App() {
     );
   }
 
-  function handleQuickTag(tag) {
-    setQuery(tag);
-    setSelectedMedicineId(resolveMedicine(tag)?.id ?? null);
-  }
-
-  function handlePhotoUpload(event) {
+  async function handlePhotoUpload(event) {
     const [file] = event.target.files ?? [];
     if (!file) return;
 
-    const lowerName = file.name.toLowerCase();
-    const detected = medicines.find((medicine) => {
-      const keywords = [medicine.name, ...medicine.aliases].map((token) => token.toLowerCase());
-      return keywords.some((token) => lowerName.includes(token.replaceAll(" ", "")) || lowerName.includes(token));
-    });
+    setOcrLoading(true);
+    setPhotoHint("이미지에서 약품명을 읽는 중입니다...");
 
-    if (detected) {
-      setQuery(detected.name);
-      setSelectedMedicineId(detected.id);
-      setPhotoHint(`사진 파일명 기반 데모 검색 결과: ${detected.name} 후보를 인식했습니다.`);
-      triggerToast("사진 기반 후보를 반영했습니다.");
+    try {
+      const { createWorker } = await import("tesseract.js");
+      const worker = await createWorker("kor+eng");
+      const result = await worker.recognize(file);
+      await worker.terminate();
+
+      const normalizedText = result.data.text.replace(/\s+/g, " ").trim();
+      const guessed = normalizedText
+        .split(" ")
+        .find((token) => token.length >= 2 && /[가-힣A-Za-z]/.test(token));
+
+      if (guessed) {
+        setQuery(guessed);
+        setPhotoHint(`OCR 인식 결과: "${guessed}"를 검색어로 반영했습니다.`);
+        await handleSearch(guessed);
+        triggerToast("사진 OCR 검색을 반영했습니다.");
+      } else {
+        setPhotoHint("OCR 결과에서 유효한 약품명을 찾지 못했습니다. 텍스트 검색을 함께 사용해 주세요.");
+      }
+    } catch {
+      setPhotoHint("OCR 처리 중 오류가 발생했습니다. 이미지가 선명한지 확인해 주세요.");
+    } finally {
+      setOcrLoading(false);
+    }
+  }
+
+  async function handleSaveStock() {
+    if (!selectedPharmacyId || !adminMedicineQuery.trim()) {
+      triggerToast("약국과 약품명을 확인해 주세요.");
       return;
     }
 
-    setPhotoHint("데모 모드에서는 파일명 기반으로만 후보를 잡습니다. 실서비스에서는 OCR 또는 비전 API로 약품명을 추출합니다.");
-  }
-
-  function handleSelectPharmacy(pharmacyId, medicineId = null) {
-    setSelectedPharmacyId(pharmacyId);
-    setHighlightedMedicineId(medicineId);
-    setSlideOpen(true);
-  }
-
-  function handleSaveStock() {
-    const pharmacy = pharmacies.find((item) => item.id === selectedPharmacyId);
-    const medicineId = adminMedicineId || resolveMedicine(adminMedicineQuery)?.id;
-    const count = Number(adminCount);
-
-    if (!pharmacy || !medicineId || Number.isNaN(count)) {
-      triggerToast("약국, 약품, 수량을 확인해 주세요.");
-      return;
+    try {
+      const data = await requestJson("/api/admin/inventory/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          pharmacyId: selectedPharmacyId,
+          medicineId: selectedMedicine?.id || null,
+          medicineName: adminMedicineQuery,
+          count: adminCount,
+          status: adminStatus
+        })
+      });
+      setPartners(data.items ?? []);
+      setHighlightedMedicineId(selectedMedicine?.id ?? null);
+      setSlideOpen(true);
+      triggerToast("서버에 재고를 저장했습니다.");
+      if (query.trim()) {
+        await handleSearch();
+      }
+    } catch {
+      triggerToast("재고 저장 중 오류가 발생했습니다.");
     }
-
-    const nextPharmacies = pharmacies.map((item) => {
-      if (item.id !== pharmacy.id) return item;
-      const existing = item.inventory.find((entry) => entry.medicineId === medicineId);
-      const nextInventory = existing
-        ? item.inventory.map((entry) =>
-            entry.medicineId === medicineId ? { ...entry, count, status: adminStatus, updatedAt: "방금" } : entry
-          )
-        : [...item.inventory, { medicineId, count, status: adminStatus, updatedAt: "방금" }];
-      return { ...item, inventory: nextInventory };
-    });
-
-    setPharmacies(nextPharmacies);
-    setHighlightedMedicineId(medicineId);
-    setSlideOpen(true);
-    triggerToast("재고를 저장했습니다.");
   }
 
-  function renderLane(items, accent, laneMode) {
+  function renderPartnerLane(items, accent, laneMode) {
     if (!items.length) {
-      return <div className="empty-state">조건에 맞는 약국이 없습니다.</div>;
+      return <div className="empty-state">조건에 맞는 파트너 약국이 없습니다.</div>;
     }
 
     return items.map((pharmacy, index) => {
@@ -273,7 +268,11 @@ function App() {
           key={`${accent}-${pharmacy.id}-${index}`}
           className="result-card"
           style={{ "--accent": accent }}
-          onClick={() => handleSelectPharmacy(pharmacy.id, searchMatches.medicine?.id ?? null)}
+          onClick={() => {
+            setSelectedPharmacyId(pharmacy.id);
+            setHighlightedMedicineId(selectedMedicine?.id ?? null);
+            setSlideOpen(true);
+          }}
         >
           <div className="result-card-header">
             <div>
@@ -294,13 +293,7 @@ function App() {
             <a className="action-button call" href={`tel:${pharmacy.phone}`} onClick={(event) => event.stopPropagation()}>
               전화 문의
             </a>
-            <a
-              className="action-button map"
-              href={buildNaverMapUrl(pharmacy)}
-              target="_blank"
-              rel="noreferrer"
-              onClick={(event) => event.stopPropagation()}
-            >
+            <a className="action-button map" href={buildNaverMapUrl(pharmacy)} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()}>
               길찾기
             </a>
           </div>
@@ -308,8 +301,6 @@ function App() {
       );
     });
   }
-
-  const pharmacyInventory = (selectedPharmacy?.inventory ?? []).slice().sort((a, b) => b.count - a.count);
 
   return (
     <>
@@ -322,7 +313,7 @@ function App() {
               <span className="brand-badge">PF</span>
               <div>
                 <strong>PharmFinder</strong>
-                <p>약국 재고 정보 전달 웹사이트</p>
+                <p>API 기반 약국 재고 정보 서비스</p>
               </div>
             </div>
             <div className="top-actions">
@@ -333,49 +324,48 @@ function App() {
 
           <section className="hero-grid">
             <div className="hero-copy">
-              <span className="eyebrow">Location + Inventory Intelligence</span>
-              <h1>방문 전에 가까운 약국과 재고가 많은 약국을 함께 확인하는 실제 웹앱</h1>
+              <span className="eyebrow">Real Service Structure</span>
+              <h1>실제 API와 서버 저장소를 붙인 약국 재고 탐색 웹사이트</h1>
               <p>
-                약 이름, 사진, 약국명으로 탐색하고 현재 위치 기준 추천과 재고 보유량 추천을 함께 제공합니다.
-                이 서비스는 판매가 아니라 정보 전달과 전화 문의, 길찾기 지원을 목표로 구성되어 있습니다.
+                파트너 약국 재고는 서버에 저장하고, 의약품 검색은 MFDS API 연동 가능 구조로, 공공 약국 정보는 국립중앙의료원 API 연동 가능 구조로 구현했습니다.
               </p>
               <div className="hero-cta">
-                <a className="primary-button" href="#consumer">소비자 플로우 보기</a>
-                <a className="secondary-button" href="#service-principles">운영 원칙 보기</a>
+                <button className="primary-button" type="button" onClick={() => handleSearch()}>현재 검색 실행</button>
+                <button className="secondary-button" type="button" onClick={handlePublicDirectoryRefresh}>공공 약국 새로고침</button>
               </div>
               <div className="hero-metrics">
                 <div className="metric-card">
-                  <span>추천 축 01</span>
-                  <strong>내 위치 기준</strong>
-                  <p>가장 가까운 약국 우선 정렬</p>
+                  <span>의약품 API</span>
+                  <strong>{serviceStatus.apis.medicine ? "활성 가능" : "키 필요"}</strong>
+                  <p>MFDS e약은요 연결 구조</p>
                 </div>
                 <div className="metric-card">
-                  <span>추천 축 02</span>
-                  <strong>재고 보유량 기준</strong>
-                  <p>가장 많이 가진 약국 우선 노출</p>
+                  <span>약국 API</span>
+                  <strong>{serviceStatus.apis.pharmacy ? "활성 가능" : "키 필요"}</strong>
+                  <p>국립중앙의료원 공공 약국 조회</p>
                 </div>
                 <div className="metric-card">
-                  <span>실행 상태</span>
-                  <strong>실제 웹앱 구조</strong>
-                  <p>Vite + React 기반 실행 가능</p>
+                  <span>사진 검색</span>
+                  <strong>{ocrLoading ? "OCR 처리 중" : "OCR 연결"}</strong>
+                  <p>Tesseract 기반 업로드 OCR</p>
                 </div>
               </div>
             </div>
 
             <div className="hero-stage card">
-              <div className="stage-ribbon">Dual Recommendation Engine</div>
+              <div className="stage-ribbon">Production-Oriented Flow</div>
               <div className="stage-stack">
                 <div className="stage-layer layer-top">
-                  <span>가까운 약국 추천</span>
-                  <strong>현재 위치 반영</strong>
+                  <span>Public Drug API</span>
+                  <strong>의약품 자동완성 / 정보 보강</strong>
                 </div>
                 <div className="stage-layer layer-mid">
-                  <span>많이 가진 약국 추천</span>
-                  <strong>재고 수량 반영</strong>
+                  <span>Partner Inventory API</span>
+                  <strong>약국 재고 저장 / 조회</strong>
                 </div>
                 <div className="stage-layer layer-low">
-                  <span>선택 후 슬라이드</span>
-                  <strong>상세 재고 정보 확장</strong>
+                  <span>Public Pharmacy API</span>
+                  <strong>지역 공공 약국 데이터 병행</strong>
                 </div>
               </div>
             </div>
@@ -386,7 +376,7 @@ function App() {
           <section id="consumer" className="section">
             <div className="section-head">
               <span className="eyebrow">Consumer Flow</span>
-              <h2>소비자 검색 경험</h2>
+              <h2>실서비스형 검색 경험</h2>
             </div>
 
             <div className="consumer-shell">
@@ -397,14 +387,7 @@ function App() {
                     { id: "photo", label: "사진 검색" },
                     { id: "pharmacy", label: "약국 검색" }
                   ].map((mode) => (
-                    <button
-                      key={mode.id}
-                      className={`tab-button ${activeMode === mode.id ? "is-active" : ""}`}
-                      onClick={() => {
-                        setActiveMode(mode.id);
-                        setSelectedMedicineId(null);
-                      }}
-                    >
+                    <button key={mode.id} className={`tab-button ${activeMode === mode.id ? "is-active" : ""}`} type="button" onClick={() => setActiveMode(mode.id)}>
                       {mode.label}
                     </button>
                   ))}
@@ -415,10 +398,7 @@ function App() {
                   <input
                     id="medicine-search"
                     value={query}
-                    onChange={(event) => {
-                      setQuery(event.target.value);
-                      setSelectedMedicineId(null);
-                    }}
+                    onChange={(event) => setQuery(event.target.value)}
                     placeholder={activeMode === "pharmacy" ? "예: 강남센트럴약국, 테헤란로" : "예: 타이레놀, 아세트아미노펜, 아드빌"}
                     autoComplete="off"
                   />
@@ -429,20 +409,33 @@ function App() {
                         type="button"
                         onClick={() => {
                           setQuery(medicine.name);
-                          setSelectedMedicineId(medicine.id);
+                          setSelectedMedicine(medicine);
                         }}
                       >
-                        {medicine.name} · {medicine.category}
+                        {medicine.name} · {medicine.manufacturer || medicine.category || "의약품"}
                       </button>
                     ))}
                   </div>
                 </div>
 
                 <div className="search-actions">
-                  <button className="primary-button" type="button" onClick={() => setQuery((current) => current.trim())}>재고 정보 확인</button>
+                  <button className="primary-button" type="button" onClick={() => handleSearch()} disabled={loading}>
+                    {loading ? "검색 중..." : "재고 정보 확인"}
+                  </button>
                   <label className="upload-button">
-                    사진 업로드
+                    {ocrLoading ? "OCR 처리 중" : "사진 업로드"}
                     <input type="file" accept="image/*" onChange={handlePhotoUpload} />
+                  </label>
+                </div>
+
+                <div className="region-grid">
+                  <label>
+                    시도
+                    <input value={city} onChange={(event) => setCity(event.target.value)} />
+                  </label>
+                  <label>
+                    시군구
+                    <input value={district} onChange={(event) => setDistrict(event.target.value)} />
                   </label>
                 </div>
 
@@ -480,7 +473,7 @@ function App() {
 
                 <div className="quick-tags">
                   {QUICK_TAGS.map((tag) => (
-                    <button key={tag} className="tag" type="button" onClick={() => handleQuickTag(tag)}>
+                    <button key={tag} className="tag" type="button" onClick={() => setQuery(tag)}>
                       {tag.replace("정500mg", "").replace("내복액", "").replace("현탁액", "")}
                     </button>
                   ))}
@@ -491,32 +484,62 @@ function App() {
                 <article className="card results-panel">
                   <div className="panel-head">
                     <div>
-                      <h3>추천 결과</h3>
-                      <p>{searchMatches.summary || "약 이름을 검색하면 가까운 약국과 재고 많은 약국을 나눠서 보여주고, 전화 문의 전 확인에 도움을 줍니다."}</p>
+                      <h3>파트너 약국 추천 결과</h3>
+                      <p>{summary || "약 이름을 검색하면 파트너 약국 재고와 지역 공공 약국 정보를 함께 보여줍니다."}</p>
                     </div>
                   </div>
                   <div className="result-columns">
                     <div className="result-lane">
                       <div className="lane-head">
-                        <span className="lane-chip distance">가까운 약국</span>
-                        <p>{userLocation ? "현재 위치 기준 가장 가까운 순으로 정렬했습니다." : "기본 거리값 기준 추천입니다."}</p>
+                        <span className="lane-chip distance">가까운 파트너 약국</span>
+                        <p>{userLocation ? "현재 위치 기준 가장 가까운 순입니다." : "기본 거리값 기준 추천입니다."}</p>
                       </div>
-                      <div className="results">{renderLane(searchMatches.distanceSorted, "var(--blue)", activeMode === "pharmacy" ? "pharmacy" : "medicine")}</div>
+                      <div className="results">{renderPartnerLane(partnerDistance, "var(--blue)", activeMode === "pharmacy" ? "pharmacy" : "medicine")}</div>
                     </div>
                     <div className="result-lane">
                       <div className="lane-head">
-                        <span className="lane-chip stock">재고 많은 약국</span>
-                        <p>보유량 기준 추천이 여기에 표시됩니다.</p>
+                        <span className="lane-chip stock">재고 많은 파트너 약국</span>
+                        <p>보유량 기준 추천입니다.</p>
                       </div>
-                      <div className="results">{renderLane(searchMatches.stockSorted, "var(--pink)", activeMode === "pharmacy" ? "pharmacy" : "medicine")}</div>
+                      <div className="results">{renderPartnerLane(partnerStock, "var(--pink)", activeMode === "pharmacy" ? "pharmacy" : "medicine")}</div>
                     </div>
+                  </div>
+                </article>
+
+                <article className="card public-directory-card">
+                  <div className="panel-head">
+                    <div>
+                      <h3>지역 공공 약국 정보</h3>
+                      <p>{serviceStatus.apis.pharmacy ? `${city} ${district} 기준 공공 약국 정보입니다.` : "API 키를 넣으면 공공 약국 정보를 실제로 불러옵니다."}</p>
+                    </div>
+                    <button className="ghost-button" type="button" onClick={handlePublicDirectoryRefresh} disabled={publicDirectoryLoading}>
+                      {publicDirectoryLoading ? "갱신 중..." : "새로고침"}
+                    </button>
+                  </div>
+                  <div className="public-directory-list">
+                    {publicPharmacies.length ? (
+                      publicPharmacies.map((pharmacy) => (
+                        <article key={pharmacy.id} className="public-pharmacy-item">
+                          <div>
+                            <strong>{pharmacy.name}</strong>
+                            <p>{pharmacy.address}</p>
+                          </div>
+                          <div className="action-row">
+                            {pharmacy.phone ? <a className="action-button call" href={`tel:${pharmacy.phone}`}>전화 문의</a> : null}
+                            <a className="action-button map" href={buildNaverMapUrl(pharmacy)} target="_blank" rel="noreferrer">길찾기</a>
+                          </div>
+                        </article>
+                      ))
+                    ) : (
+                      <div className="empty-state">표시할 공공 약국 정보가 없습니다.</div>
+                    )}
                   </div>
                 </article>
 
                 <aside className={`slide-panel ${slideOpen ? "is-open" : ""}`} aria-live="polite">
                   <div className="slide-panel-inner">
                     <div className="slide-head">
-                      <span className="slide-pill">Pharmacy Detail</span>
+                      <span className="slide-pill">Partner Pharmacy Detail</span>
                       <button className="ghost-button slide-close" type="button" onClick={() => setSlideOpen(false)}>닫기</button>
                     </div>
                     <div className="slide-content">
@@ -528,12 +551,6 @@ function App() {
                             <span className="pill">{selectedPharmacy.phone}</span>
                             <span className="pill">{selectedPharmacy.hours}</span>
                             <span className="pill">{selectedPharmacy.source}</span>
-                            <span className="pill">
-                              거리 {(userLocation
-                                ? haversineKm(userLocation.lat, userLocation.lng, selectedPharmacy.lat, selectedPharmacy.lng)
-                                : selectedPharmacy.distanceKm
-                              ).toFixed(1)}km
-                            </span>
                           </div>
                           <p>재고 정보는 참고용이며, 실제 구매 가능 여부와 복약 상담은 반드시 해당 약국 약사에게 직접 확인하세요.</p>
                           <div className="action-row">
@@ -542,18 +559,17 @@ function App() {
                           </div>
                           <ul className="inventory-list">
                             {pharmacyInventory.map((stock) => {
-                              const medicine = medicines.find((item) => item.id === stock.medicineId);
-                              const isHighlight = highlightedMedicineId === stock.medicineId;
+                              const isHighlight = highlightedMedicineId && highlightedMedicineId === stock.medicineId;
                               return (
                                 <li
                                   key={`${selectedPharmacy.id}-${stock.medicineId}`}
                                   style={isHighlight ? { padding: 12, borderRadius: 16, background: "rgba(102,247,223,0.08)" } : undefined}
                                 >
                                   <div className="stock-line">
-                                    <strong>{medicine?.name ?? stock.medicineId}</strong>
+                                    <strong>{stock.medicineName}</strong>
                                     <span className={`stock-state ${stockClassName(stock.status)}`}>{stock.status} ({stock.count})</span>
                                   </div>
-                                  <div>{medicine?.category ?? ""} · 마지막 반영 {stock.updatedAt}</div>
+                                  <div>마지막 반영 {stock.updatedAt}</div>
                                 </li>
                               );
                             })}
@@ -575,20 +591,20 @@ function App() {
           <section id="service-principles" className="section">
             <div className="section-head">
               <span className="eyebrow">Service Principles</span>
-              <h2>리스크를 낮추는 서비스 원칙</h2>
+              <h2>실서비스 운영 원칙</h2>
             </div>
             <div className="plan-grid">
               <article className="card">
-                <h3>정보 제공 중심</h3>
-                <p>서비스는 약국 위치, 운영시간, 재고 상태, 갱신 시각을 전달하는 정보 플랫폼으로 동작합니다.</p>
+                <h3>API 기반 약품 검색</h3>
+                <p>의약품 자동완성과 기본 정보는 MFDS e약은요 API를 연결할 수 있게 만들었습니다.</p>
               </article>
               <article className="card">
-                <h3>판매 행위 배제</h3>
-                <p>주문, 결제, 예약 확정, 픽업 보장 흐름은 두지 않고 전화 문의와 길찾기 중심으로 안내합니다.</p>
+                <h3>서버 재고 저장</h3>
+                <p>파트너 약국 재고는 서버 JSON 저장소에 반영되도록 바꿔 브라우저 로컬 상태에만 의존하지 않습니다.</p>
               </article>
               <article className="card">
-                <h3>최종 확인 주체 명확화</h3>
-                <p>구매 가능 여부와 복약 관련 판단은 해당 약국 약사 확인이 최종이라는 문구를 핵심 화면에 반복 노출합니다.</p>
+                <h3>공공 약국 정보 병행</h3>
+                <p>국립중앙의료원 API를 붙이면 특정 지역의 실제 공공 약국 정보를 함께 조회할 수 있습니다.</p>
               </article>
             </div>
           </section>
@@ -600,41 +616,19 @@ function App() {
             </div>
             <div className="admin-layout">
               <article className="card">
-                <h3>재고 수정</h3>
+                <h3>서버 저장형 재고 수정</h3>
                 <div className="admin-form">
                   <label>
                     약국 선택
                     <select value={selectedPharmacyId ?? ""} onChange={(event) => setSelectedPharmacyId(event.target.value)}>
-                      {pharmacies.map((pharmacy) => (
+                      {partners.map((pharmacy) => (
                         <option key={pharmacy.id} value={pharmacy.id}>{pharmacy.name}</option>
                       ))}
                     </select>
                   </label>
                   <label>
                     약품 선택
-                    <input
-                      type="text"
-                      placeholder="약품명 검색"
-                      value={adminMedicineQuery}
-                      onChange={(event) => {
-                        setAdminMedicineQuery(event.target.value);
-                        setAdminMedicineId(null);
-                      }}
-                    />
-                    <div className="autocomplete">
-                      {adminSuggestions.map((medicine) => (
-                        <button
-                          key={medicine.id}
-                          type="button"
-                          onClick={() => {
-                            setAdminMedicineQuery(medicine.name);
-                            setAdminMedicineId(medicine.id);
-                          }}
-                        >
-                          {medicine.name} · {medicine.category}
-                        </button>
-                      ))}
-                    </div>
+                    <input value={adminMedicineQuery} onChange={(event) => setAdminMedicineQuery(event.target.value)} placeholder="약품명 검색 또는 직접 입력" />
                   </label>
                   <label>
                     재고 수량
@@ -651,27 +645,24 @@ function App() {
                   </label>
                   <button className="primary-button" type="button" onClick={handleSaveStock}>재고 저장</button>
                 </div>
-                <p className="helper">실서비스에서는 POS/ERP 연동 품목은 자동 동기화하고, 누락 품목만 수기 보정하는 구조가 적합합니다.</p>
+                <p className="helper">실서비스에서는 이 저장 로직을 DB와 POS 연동 레이어로 교체하면 됩니다.</p>
               </article>
 
               <article className="card">
-                <h3>현재 약국 재고 스냅샷</h3>
+                <h3>현재 파트너 약국 재고</h3>
                 <div className="inventory-board">
-                  {pharmacyInventory.map((stock) => {
-                    const medicine = medicines.find((item) => item.id === stock.medicineId);
-                    return (
-                      <div className="inventory-item" key={`${selectedPharmacyId}-${stock.medicineId}`}>
-                        <div>
-                          <strong>{medicine?.name ?? stock.medicineId}</strong>
-                          <p>{medicine?.category ?? ""}</p>
-                        </div>
-                        <div style={{ textAlign: "right" }}>
-                          <div className={`stock-state ${stockClassName(stock.status)}`}>{stock.status}</div>
-                          <div>{stock.count}개</div>
-                        </div>
+                  {pharmacyInventory.map((stock) => (
+                    <div className="inventory-item" key={`${selectedPharmacyId}-${stock.medicineId}`}>
+                      <div>
+                        <strong>{stock.medicineName}</strong>
+                        <p>마지막 반영 {stock.updatedAt}</p>
                       </div>
-                    );
-                  })}
+                      <div style={{ textAlign: "right" }}>
+                        <div className={`stock-state ${stockClassName(stock.status)}`}>{stock.status}</div>
+                        <div>{stock.count}개</div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </article>
             </div>

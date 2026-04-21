@@ -1,6 +1,6 @@
 # PharmFinder MVP
 
-약국 재고 정보 전달 중심의 실제 실행 가능한 React 웹사이트 MVP입니다.
+약국 재고 정보 전달 중심의 실제 실행 가능한 `React + Express` 웹사이트입니다.
 
 ## 포함 내용
 
@@ -15,22 +15,30 @@
 - 부드러운 hover / press 인터랙션
 - 전화 문의 / 길찾기 정보성 액션
 - 정보 제공 중심 법률 리스크 완화 문구
-- `Vite + React` 기반 실제 웹앱 구조
+- `Vite + React + Express` 기반 실제 서비스 구조
+- 서버 저장형 파트너 약국 재고 관리
+- MFDS / 국립중앙의료원 공공 API 연결 가능 구조
+- OCR 기반 사진 검색 연결
 
 ## 실행 방법
 
 ```bash
-npm install
 npm run dev
 ```
 
-기본 개발 서버 주소는 `http://localhost:4173` 입니다.
+기본 개발 서버:
+
+- 프론트엔드: `http://localhost:4173`
+- 백엔드 API: `http://localhost:8787`
 
 배포 빌드는 아래 명령으로 생성합니다.
 
 ```bash
 npm run build
+npm run start
 ```
+
+`npm run start`는 빌드된 프론트엔드와 API 서버를 함께 제공합니다.
 
 ## 현재 포지션
 
@@ -48,8 +56,9 @@ npm run build
 
 ## 배포
 
-- GitHub Pages 배포 워크플로우를 포함했습니다.
-- 저장소의 Pages 설정이 GitHub Actions 배포를 사용하도록 켜져 있으면 자동 배포할 수 있습니다.
+- `Dockerfile`을 포함했습니다.
+- `render.yaml`을 포함했습니다.
+- Render, Railway, Fly.io 같은 Node 호스팅에 바로 올릴 수 있는 형태입니다.
 
 ## 문서
 

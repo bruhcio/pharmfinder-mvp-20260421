@@ -4,9 +4,12 @@
   "version": "1.0.0",
   "description": "약국 재고 정보 전달 중심 웹사이트 MVP",
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:web": "vite",
+    "dev:api": "node server.mjs",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "start": "node server.mjs"
   },
   "repository": {
     "type": "git",
@@ -21,8 +24,15 @@
   },
   "homepage": "https://github.com/bruhcio/pharmfinder-mvp-20260421#readme",
   "dependencies": {
+    "axios": "^1.15.1",
+    "concurrently": "^9.2.1",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
+    "fast-xml-parser": "^5.7.1",
+    "multer": "^2.1.1",
     "react": "^19.2.5",
-    "react-dom": "^19.2.5"
+    "react-dom": "^19.2.5",
+    "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.0.1",

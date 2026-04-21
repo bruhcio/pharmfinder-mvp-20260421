@@ -120,6 +120,8 @@ a { color: inherit; text-decoration: none; }
 .consumer-shell { grid-template-columns: 380px minmax(0, 1fr); align-items: start; }
 .search-rail { position: sticky; top: 18px; }
 .search-box, .admin-form, .admin-form label { display: grid; gap: 10px; }
+.region-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 18px; }
+.region-grid label { display: grid; gap: 10px; }
 .search-box input, .admin-form input, .admin-form select {
   width: 100%; padding: 15px 16px; border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 18px;
   background: rgba(255, 255, 255, 0.08); color: var(--text); outline: none;
@@ -171,6 +173,12 @@ a { color: inherit; text-decoration: none; }
 .result-columns { grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; }
 .lane-head { margin-bottom: 14px; }
 .results { display: grid; gap: 12px; }
+.public-directory-card { margin-top: 20px; }
+.public-directory-list { display: grid; gap: 12px; margin-top: 16px; }
+.public-pharmacy-item {
+  display: flex; justify-content: space-between; gap: 16px; padding: 16px; border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.1); background: rgba(255, 255, 255, 0.04);
+}
 .result-card {
   position: relative; padding: 18px; border-radius: 22px; background: linear-gradient(160deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
   border: 1px solid rgba(255, 255, 255, 0.1); cursor: pointer; overflow: hidden;
@@ -237,5 +245,7 @@ input[type="file"] { display: none; }
   .top-actions { justify-content: flex-start; }
   .card { padding: 20px; }
   .location-box { flex-direction: column; align-items: flex-start; }
+  .region-grid { grid-template-columns: 1fr; }
+  .public-pharmacy-item { flex-direction: column; }
   .hero-copy h1 { max-width: none; }
 }

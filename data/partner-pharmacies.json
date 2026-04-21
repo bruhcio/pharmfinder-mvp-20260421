@@ -1,0 +1,70 @@
+[
+  {
+    "id": "ph-001",
+    "name": "강남센트럴약국",
+    "district": "서울 강남구",
+    "distanceKm": 0.8,
+    "address": "서울 강남구 테헤란로 152",
+    "phone": "02-555-1245",
+    "hours": "평일 09:00 - 21:00 / 토 09:00 - 17:00",
+    "lat": 37.5006,
+    "lng": 127.0367,
+    "source": "POS 연동",
+    "inventory": [
+      { "medicineId": "med-001", "medicineName": "타이레놀정500mg", "count": 42, "status": "충분", "updatedAt": "5분 전" },
+      { "medicineId": "med-002", "medicineName": "아드빌정", "count": 11, "status": "소량", "updatedAt": "8분 전" },
+      { "medicineId": "med-005", "medicineName": "지르텍정", "count": 19, "status": "충분", "updatedAt": "12분 전" }
+    ]
+  },
+  {
+    "id": "ph-002",
+    "name": "역삼365약국",
+    "district": "서울 강남구",
+    "distanceKm": 1.2,
+    "address": "서울 강남구 역삼로 134",
+    "phone": "02-553-3650",
+    "hours": "매일 08:00 - 23:00",
+    "lat": 37.4953,
+    "lng": 127.0332,
+    "source": "수기 입력",
+    "inventory": [
+      { "medicineId": "med-001", "medicineName": "타이레놀정500mg", "count": 9, "status": "소량", "updatedAt": "방금" },
+      { "medicineId": "med-003", "medicineName": "판콜에이내복액", "count": 16, "status": "충분", "updatedAt": "3분 전" },
+      { "medicineId": "med-004", "medicineName": "겔포스엠현탁액", "count": 5, "status": "품절 임박", "updatedAt": "3분 전" }
+    ]
+  },
+  {
+    "id": "ph-003",
+    "name": "선릉메디약국",
+    "district": "서울 강남구",
+    "distanceKm": 2.4,
+    "address": "서울 강남구 선릉로 433",
+    "phone": "02-568-8891",
+    "hours": "평일 09:00 - 19:30",
+    "lat": 37.5048,
+    "lng": 127.0481,
+    "source": "POS 연동",
+    "inventory": [
+      { "medicineId": "med-002", "medicineName": "아드빌정", "count": 27, "status": "충분", "updatedAt": "11분 전" },
+      { "medicineId": "med-004", "medicineName": "겔포스엠현탁액", "count": 14, "status": "소량", "updatedAt": "11분 전" },
+      { "medicineId": "med-006", "medicineName": "인사돌플러스정", "count": 7, "status": "품절 임박", "updatedAt": "18분 전" }
+    ]
+  },
+  {
+    "id": "ph-004",
+    "name": "삼성온누리약국",
+    "district": "서울 강남구",
+    "distanceKm": 3.1,
+    "address": "서울 강남구 삼성로 521",
+    "phone": "02-542-7775",
+    "hours": "평일 09:00 - 20:00 / 일 휴무",
+    "lat": 37.5081,
+    "lng": 127.0639,
+    "source": "수기 입력",
+    "inventory": [
+      { "medicineId": "med-001", "medicineName": "타이레놀정500mg", "count": 0, "status": "품절", "updatedAt": "26분 전" },
+      { "medicineId": "med-003", "medicineName": "판콜에이내복액", "count": 21, "status": "충분", "updatedAt": "26분 전" },
+      { "medicineId": "med-005", "medicineName": "지르텍정", "count": 4, "status": "품절 임박", "updatedAt": "26분 전" }
+    ]
+  }
+]

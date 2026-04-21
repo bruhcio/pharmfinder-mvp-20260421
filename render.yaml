@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: pharmfinder-mvp
+    runtime: node
+    plan: free
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start
+    envVars:
+      - key: PUBLIC_DATA_SERVICE_KEY
+        sync: false
+      - key: MFDS_SERVICE_KEY
+        sync: false
+      - key: NMC_SERVICE_KEY
+        sync: false
