@@ -10,6 +10,16 @@ A pharmacy inventory search MVP that helps users find nearby pharmacies by medic
 
 </div>
 
+## Preview / 예시 화면
+
+<p align="center">
+  <img src="docs/images/pharmfinder-home.png" alt="PharmFinder home screen" width="420" />
+</p>
+
+The home screen shows the consumer search flow, public API-ready structure, and partner pharmacy inventory data path.
+
+홈 화면은 소비자 검색 흐름, 공공 API 연동 가능 구조, 파트너 약국 재고 데이터 흐름을 첫 화면에서 확인할 수 있도록 구성했습니다.
+
 ---
 
 ## Overview
